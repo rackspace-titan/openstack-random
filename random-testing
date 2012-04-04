@@ -24,18 +24,25 @@ import novaclient.v1_1.client
 
 max_servers = 1
 
+username = os.environ['NOVA_USERNAME']
+apikey = os.environ['NOVA_API_KEY']
+tenant = os.environ['NOVA_PROJECT_ID']
+url = os.environ['NOVA_URL']
+region = os.environ['NOVA_REGION_NAME']
+servicename = os.environ['NOVA_SERVICE_NAME']
+
 users = {
-    'admin': {'key': 'admin', 'tenant': 'openstack'},
+    username: {'key': apikey, 'tenant': tenant},
 }
 
-#auth_url = 'https://identity.api.rackspacecloud.com/v2.0/'
-#auth_data = {
-#    'region_name': 'DFW',
-#    'service_name': 'cloudServers',
-#}
+auth_url = url
+auth_data = {
+    'region_name': region,
+    'service_name': servicename,
+}
 
-auth_url = 'http://127.0.0.1:8774/'
-auth_data = {}
+#auth_url = 'http://127.0.0.1:8774/'
+#auth_data = {}
 
 
 def weighted_sample(items, n):
@@ -75,6 +82,7 @@ class Tenant(object):
                 self.creds['key'],
                 self.creds['tenant'],
                 auth_url,
+                insecure = True,
                 **auth_data)
 
         self.flavors = self.client.flavors.list()
@@ -390,7 +398,7 @@ def tenant_thread(tenant):
 
 # FIXME: Hack until the rest of the script is working and we want to
 # use multiple threads for multiple users
-tenant_loop('admin')
+tenant_loop(username)
 
 # Randomly start new tenants. Both starting new work and restarting tenant
 # threads that randomly decided to finish and kill everything off.
