@@ -12,6 +12,7 @@
 # want to end up with an instance that is deleted.
 
 import os
+import optparse
 import random
 import sys
 import threading
@@ -428,8 +429,40 @@ Keeping it here as an archive if anyone sees difference in what the proposed and
 fixed code does.
 tenants = []
 while True:
-    thread = threading.Thread(target=tenant_thread, name=tenant, args=(tenant,))
+    thread = threading.Thread(target=tenant_thread, name=tenant, \
+    args=(tenant,))
     thread.start()
 
     # FIXME: Random delay, only if we don't have enough tenants
     thread_event.wait(10)"""
+
+def parse_options():
+    """pknouff please check the note below"""
+    parser = optparse.OptionParser()
+    return parser.parse_args()
+    
+
+def main():
+    options, args = parse_options()
+
+"""This is not needed as a part of threading anymore. pknouff: please check 
+if you need this block is needed here in the main"""
+
+"""================================================================
+    # FIXME: Hack until the rest of the script is working and we want to
+    # use multiple threads for multiple users
+    tenant_loop(username)
+
+    # Randomly start new tenants. Both starting new work and restarting tenant
+    # threads that randomly decided to finish and kill everything off.
+    tenants = []
+    while True:
+        thread = threading.Thread(target=tenant_thread, name=tenant, \
+        args=(tenant,))
+        thread.start()
+
+        # FIXME: Random delay, only if we don't have enough tenants
+        thread_event.wait(10)======================================"""
+
+if __name__ == "__main__":
+    sys.exit(main())
