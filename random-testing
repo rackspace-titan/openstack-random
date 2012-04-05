@@ -20,27 +20,22 @@ import time
 import novaclient.exceptions
 import novaclient.v1_1.client
 
-#os.environ['NOVA_RAX_AUTH'] = '1'
+os.environ['NOVA_RAX_AUTH'] = '1'
 
 max_servers = 1
 
-username = os.environ['NOVA_USERNAME']
-apikey = os.environ['NOVA_API_KEY']
-tenant = os.environ['NOVA_PROJECT_ID']
-url = os.environ['NOVA_URL']
-region = os.environ['NOVA_REGION_NAME']
-servicename = os.environ['NOVA_SERVICE_NAME']
-
 users = {
-    username: {'key': apikey, 'tenant': tenant},
+    'user_name': {'key': 'api_key', 'tenant': 'tenant_id'},
 }
 
-auth_url = url
+# staging conf
+auth_url = 'https://auth.staging.us.ccp.rackspace.net/v2.0/'
 auth_data = {
-    'region_name': region,
-    'service_name': servicename,
+    'region_name': 'DFW',
+    'service_name': 'cloudServersPreprod',
 }
 
+# localhost conf
 #auth_url = 'http://127.0.0.1:8774/'
 #auth_data = {}
 
@@ -82,7 +77,7 @@ class Tenant(object):
                 self.creds['key'],
                 self.creds['tenant'],
                 auth_url,
-                insecure = True,
+                insecure=True,
                 **auth_data)
 
         self.flavors = self.client.flavors.list()
@@ -398,14 +393,36 @@ def tenant_thread(tenant):
 
 # FIXME: Hack until the rest of the script is working and we want to
 # use multiple threads for multiple users
-tenant_loop(username)
+# FIXED: To avoid over subscription on a machine, user input for the number
+# of threads is put in. 
+
+num_thrd_per_tnt = raw_input("Enter the number of threads that you want to \
+run per tenant\n")
+threads = {}
+myiter=0
+
+for kee, val in users.iteritems():
+    for it in range(int(num_thrd_per_tnt)):
+        myiter+=1
+        threads[str(myiter)] = threading.Thread(target=tenant_loop, \
+        name=kee, args=(kee,))
+        threads[str(myiter)].start()
+
+for i in range(myiter):
+    threads[str(i)].join()
+
+#tenant_loop('user_name')
 
 # Randomly start new tenants. Both starting new work and restarting tenant
 # threads that randomly decided to finish and kill everything off.
+
+"""The below given code is previously proposed fix for the multiple threads.
+Keeping it here as an archive if anyone sees difference in what the proposed and
+fixed code does.
 tenants = []
 while True:
     thread = threading.Thread(target=tenant_thread, name=tenant, args=(tenant,))
     thread.start()
 
     # FIXME: Random delay, only if we don't have enough tenants
-    thread_event.wait(10)
+    thread_event.wait(10)"""
