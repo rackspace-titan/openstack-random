@@ -25,17 +25,24 @@ os.environ['NOVA_RAX_AUTH'] = '1'
 max_servers = 1
 
 users = {
-    'user_name': {'key': 'api_key', 'tenant': 'tenant_id'},
+    'komawar': {'key': '0f97f489c848438090250d50c7e1ea88', 'tenant': '5820858'},
+# currently westmass creds are invalid    
+# 'westmass' : {'key': '0f97f489c848438090250d50c7e1ea88', 'tenant': '5820858'},
 }
 
-# staging conf
+print "The users in our db who will run os-ran are:\n"
+for kee, val in users.iteritems():
+    print kee + '\n'
+
+ans = raw_input("Do you wish to enter more users?")
+#raw_input("Test input\n")
+
 auth_url = 'https://auth.staging.us.ccp.rackspace.net/v2.0/'
 auth_data = {
     'region_name': 'DFW',
     'service_name': 'cloudServersPreprod',
 }
 
-# localhost conf
 #auth_url = 'http://127.0.0.1:8774/'
 #auth_data = {}
 
@@ -397,7 +404,7 @@ def tenant_thread(tenant):
 # of threads is put in. 
 
 num_thrd_per_tnt = raw_input("Enter the number of threads that you want to \
-run per tenant\n")
+run per tenant")
 threads = {}
 myiter=0
 
@@ -411,7 +418,7 @@ for kee, val in users.iteritems():
 for i in range(myiter):
     threads[str(i)].join()
 
-#tenant_loop('user_name')
+#tenant_loop('komawar')
 
 # Randomly start new tenants. Both starting new work and restarting tenant
 # threads that randomly decided to finish and kill everything off.
