@@ -449,6 +449,8 @@ def main():
 if you need this block is needed here in the main"""
 
 """================================================================
+=======
+>>>>>>> 5f4c03ea758cb8093610596f0e324fc903592615
     # FIXME: Hack until the rest of the script is working and we want to
     # use multiple threads for multiple users
     tenant_loop(username)
@@ -457,6 +459,7 @@ if you need this block is needed here in the main"""
     # threads that randomly decided to finish and kill everything off.
     tenants = []
     while True:
+<<<<<<< HEAD
         thread = threading.Thread(target=tenant_thread, name=tenant, \
         args=(tenant,))
         thread.start()
