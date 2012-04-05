@@ -26,24 +26,40 @@ os.environ['NOVA_RAX_AUTH'] = '1'
 max_servers = 1
 
 users = {
-    'komawar': {'key': '0f97f489c848438090250d50c7e1ea88', 'tenant': '5820858'},
-# currently westmass creds are invalid    
-# 'westmass' : {'key': '0f97f489c848438090250d50c7e1ea88', 'tenant': '5820858'},
+# currently all creds are invalid    
+# 'admin' : {'key': '0f97f489c848438090250d50c7e1ea88', 'tenant': '5820858'},
+# 'admin' : {'key': '0f97f489c848438090250d50c7e1ea88', 'tenant': '5820858'},
 }
 
 print "The users in our db who will run os-ran are:\n"
 for kee, val in users.iteritems():
     print kee + '\n'
 
-ans = raw_input("Do you wish to enter more users?")
-#raw_input("Test input\n")
+ans = 'y'
 
+while ans=='y':
+    ans = raw_input("Do you wish to enter more users/tenant? y/N  ")
+    if ans=='y' or ans=='Y' or ans=='Yes' or ans=='yes':
+        mykey = raw_input("Enter the user name of the tenant  ")
+        users[mykey] = {}
+        users[mykey]['key'] = raw_input("Please enter the api key for this\
+ user  ")
+        users[mykey]['tenant'] = raw_input("Please enter the tenant id for\
+ this user  ")
+        ans = 'y'
+    elif ans=='n' or ans=='N' or ans=='No' or ans=='no':
+        pass
+    else:
+        pass
+
+# staging auth conf
 auth_url = 'https://auth.staging.us.ccp.rackspace.net/v2.0/'
 auth_data = {
     'region_name': 'DFW',
     'service_name': 'cloudServersPreprod',
 }
 
+# local host aut conf
 #auth_url = 'http://127.0.0.1:8774/'
 #auth_data = {}
 
@@ -405,19 +421,19 @@ def tenant_thread(tenant):
 # of threads is put in. 
 
 num_thrd_per_tnt = raw_input("Enter the number of threads that you want to \
-run per tenant")
+run per tenant  ")
 threads = {}
 myiter=0
 
 for kee, val in users.iteritems():
     for it in range(int(num_thrd_per_tnt)):
-        myiter+=1
+        myiter= myiter + 1
         threads[str(myiter)] = threading.Thread(target=tenant_loop, \
         name=kee, args=(kee,))
         threads[str(myiter)].start()
 
 for i in range(myiter):
-    threads[str(i)].join()
+    threads[str(i+1)].join()
 
 #tenant_loop('komawar')
 
