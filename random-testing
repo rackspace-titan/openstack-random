@@ -280,6 +280,22 @@ operations = [
     (1, Delete),
 ]
 
+def clean_up(name):
+
+# TODO: delete custom images in the account
+# currently the core just deletes the instances from the account and cleans it
+# up before starting the os-ran loop
+
+    tenant = Tenant(name)
+
+    for server in tenant.client.servers.list():
+        print '%s %-14s %s' % (server.id, server.status, server.name)
+        instance = Instance(server)
+        tenant.add_instance(instance)
+
+        instance.current_operation = Delete(tenant, instance)
+        instance.current_operation.setup()
+        instance.current_operation.execute()
 
 def tenant_loop(name, endtime):
     # FIXME: Implement personalities? (Blend of images, blend of flavors,
@@ -401,8 +417,13 @@ def parse_options():
     parser.add_option("-n",
                       "--duration",
                       dest="duration",
-                      help="Approzimate amount of time to run in seconds",
+                      help="Approzimate amount of time to run in seconds.",
                       default=600)
+    parser.add_option("-w",
+                      "--wipe",
+                      action="store_true",
+                      dest="cleanup_acc",
+                      help="Clean up the account before starting the os-ran.")
     return parser.parse_args()
     
 
@@ -432,11 +453,17 @@ def main():
         else:
             pass
 
+    if options.cleanup_acc==True:
+        clean_up('komawar')
+    else:
+        print "Not wiping"
 # FIXME: Hack until the rest of the script is working and we want to
 # use multiple threads for multiple users
 # FIXED: To avoid over subscription on a machine, user input for the number
 # of threads is put in. 
-
+#    """This block is for the debug"""
+#    respon = raw_input("Do you want to enter the os-ran mode? y/N  ")
+#    if respon=='y':
     num_thrd_per_tnt = raw_input("Enter the number of threads that you want to \
     run per tenant  ")
     threads = {}
@@ -445,13 +472,14 @@ def main():
     for kee, val in users.iteritems():
         for it in range(int(num_thrd_per_tnt)):
             myiter= myiter + 1
-            threads[str(myiter)] = threading.Thread(target=tenant_loop, \
+            threads[str(myiter)] = threading.Thread(target=tenant_thread, \
             name=kee, args=(kee, end_time))
             threads[str(myiter)].start()
 
     for i in range(myiter):
         threads[str(i+1)].join()
 
+#    """End of debug block"""
 #tenant_loop('komawar')
 
 # Randomly start new tenants. Both starting new work and restarting tenant
