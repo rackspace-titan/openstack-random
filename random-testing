@@ -229,7 +229,7 @@ class Resize(Operation):
 
         return super(Resize, self).update(result)
 
-    def __str_(self):
+    def __str__(self):
         return 'Resize flavor=%dMB' % self.flavor.ram
 
 
