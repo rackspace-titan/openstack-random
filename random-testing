@@ -302,6 +302,22 @@ operations = [
 ]
 
 
+def clean_up(name):
+# TODO: delete custom images in the account
+# currently the core just deletes the instances from the account and cleans it
+# up before starting the os-ran loop
+
+    tenant = Tenant(name)
+
+    for server in tenant.client.servers.list():
+        print '%s %-14s %s' % (server.id, server.status, server.name)
+        instance = Instance(server)
+        tenant.add_instance(instance)
+
+        instance.current_operation = Delete(tenant, instance)
+        instance.current_operation.setup()
+        instance.current_operation.execute()
+
 def tenant_loop(name, endtime):
     # FIXME: Implement personalities? (Blend of images, blend of flavors,
     # auto-disk config, gives up easily, etc)
@@ -410,7 +426,6 @@ def tenant_loop(name, endtime):
             #NOTE(ameade): add call to clean up here
             return
 
-
 def tenant_thread(tenant):
     try:
         tenant_loop(tenant)
@@ -423,20 +438,65 @@ def parse_options():
     parser.add_option("-n",
                       "--duration",
                       dest="duration",
-                      help="Approzimate amount of time to run in seconds",
+                      help="Approzimate amount of time to run in seconds.",
                       default=600)
+    parser.add_option("-w",
+                      "--wipe",
+                      action="store_true",
+                      dest="cleanup_acc",
+                      help="Clean up the account before starting the os-ran.")
+    parser.add_option("-p",
+                      "--parallel",
+                      action="store_true",
+                      dest="multi_thread",
+                      help="Enable multi-threading for multiple users")
+    parser.add_option("-a",
+                      "--add",
+                      action="store_true",
+                      dest="add_users",
+                      help="Enable addition of multiple users on command line.")
     return parser.parse_args()
     
+def multi_thread(end_time):
+# FIXME: Hack until the rest of the script is working and we want to
+# use multiple threads for multiple users
+# FIXED: To avoid over subscription on a machine, user input for the number
+# of threads is put in. 
+#    """This block is for the debug"""
+#    respon = raw_input("Do you want to enter the os-ran mode? y/N  ")
+#    if respon=='y':
+    num_thrd_per_tnt = raw_input("Enter the number of threads that you want to \
+    run per tenant  ")
+    threads = {}
+    myiter=0
 
-def main():
-    options, args = parse_options()
-    start_time = time.time()
-    end_time = start_time + int(options.duration)
-
-    print "The users in our db who will run os-ran are:\n"
     for kee, val in users.iteritems():
-        print kee + '\n'
+        for it in range(int(num_thrd_per_tnt)):
+            myiter= myiter + 1
+            threads[str(myiter)] = threading.Thread(target=tenant_thread, \
+            name=kee, args=(kee, end_time))
+            threads[str(myiter)].start()
 
+    for i in range(myiter):
+        threads[str(i+1)].join()
+
+#    """End of debug block"""
+#tenant_loop('komawar')
+
+def single_thread(end_time):
+#runs single thread per user
+    threads = {}
+    myiter=0
+    for kee, val in users.iteritems():
+        myiter= myiter + 1
+        threads[str(myiter)] = threading.Thread(target=tenant_thread, \
+        name=kee, args=(kee, end_time))
+        threads[str(myiter)].start()
+
+    for i in range(myiter):
+        threads[str(i+1)].join()
+
+def enter_users():
     ans = 'y'
 
     while ans=='y':
@@ -454,26 +514,71 @@ def main():
         else:
             pass
 
-# FIXME: Hack until the rest of the script is working and we want to
-# use multiple threads for multiple users
-# FIXED: To avoid over subscription on a machine, user input for the number
-# of threads is put in. 
+def main():
+    options, args = parse_options()
+    start_time = time.time()
+    end_time = start_time + int(options.duration)
 
-    num_thrd_per_tnt = raw_input("Enter the number of threads that you want to \
-    run per tenant  ")
-    threads = {}
-    myiter=0
-
+    print "The users in our db who will run os-ran are:\n"
     for kee, val in users.iteritems():
-        for it in range(int(num_thrd_per_tnt)):
-            myiter= myiter + 1
-            threads[str(myiter)] = threading.Thread(target=tenant_loop, \
-            name=kee, args=(kee, end_time))
-            threads[str(myiter)].start()
+        print kee + '\n'
 
-    for i in range(myiter):
-        threads[str(i+1)].join()
+    if options.add_users==True:
+        print "Adding users to account."
+        enter_users()
+    else:
+        print "Not adding users to account."
+        pass
 
+    if options.cleanup_acc==True:
+        print "Account is being wiped."
+        for kee, val in users.iteritems():
+            clean_up(kee)
+    else:
+        print "Account is not being wiped."
+    
+    if options.multi_thread==True:
+        print "Entering the multi threaded block."
+        multi_thread(end_time)
+    else:
+        print "Entering the single threaded block."
+        single_thread(end_time)
+
+# Randomly start new tenants. Both starting new work and restarting tenant
+# threads that randomly decided to finish and kill everything off.
+
+    """The below given code is previously proposed fix for the multiple threads.
+    Keeping it here as an archive if anyone sees difference in what the proposed and
+    fixed code does.
+    tenants = []
+    while True:
+        thread = threading.Thread(target=tenant_thread, name=tenant, \
+        args=(tenant,))
+        thread.start()
+
+        # FIXME: Random delay, only if we don't have enough tenants
+        thread_event.wait(10)"""
+
+    """This is not needed as a part of threading anymore. pknouff: please check 
+    if you need this block is needed here in the main"""
+
+    """================================================================
+    =======
+    >>>>>>> 5f4c03ea758cb8093610596f0e324fc903592615
+        # FIXME: Hack until the rest of the script is working and we want to
+        # use multiple threads for multiple users
+        tenant_loop(username)
+
+        # Randomly start new tenants. Both starting new work and restarting tenant
+        # threads that randomly decided to finish and kill everything off.
+        tenants = []
+        while True:
+            thread = threading.Thread(target=tenant_thread, name=tenant, \
+            args=(tenant,))
+            thread.start()
+
+            # FIXME: Random delay, only if we don't have enough tenants
+            thread_event.wait(10)======================================"""
 
 if __name__ == "__main__":
     sys.exit(main())
