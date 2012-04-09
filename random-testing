@@ -11,6 +11,7 @@
 # We also want to end up in a predetermined end state. In our case, we
 # want to end up with an instance that is deleted.
 
+import logging
 import os
 import optparse
 import random
@@ -21,21 +22,34 @@ import time
 import novaclient.exceptions
 import novaclient.v1_1.client
 
-os.environ['NOVA_RAX_AUTH'] = '1'
+
+LOG = logging.getLogger(__name__)
+logging.basicConfig(filename='random.log', level=LOG.debug)
+
+
+
+max_servers = 1
+
+username = os.environ['NOVA_USERNAME']
+apikey = os.environ['NOVA_API_KEY']
+tenant = os.environ['NOVA_PROJECT_ID']
+url = os.environ['NOVA_URL']
+region = os.environ['NOVA_REGION_NAME']
+servicename = os.environ['NOVA_SERVICE_NAME']
 
 users = {
-# currently all creds are invalid    
-# 'admin' : {'key': '0f97f489c848438090250d50c7e1ea88', 'tenant': '5820858'},
+        username: {'key': apikey, 'tenant': tenant},
 }
 
 # staging auth conf
-auth_url = 'https://auth.staging.us.ccp.rackspace.net/v2.0/'
+auth_url = url
 auth_data = {
-    'region_name': 'DFW',
-    'service_name': 'cloudServersPreprod',
+    'region_name': region,
+    'service_name': servicename,
 }
 
 # local host aut conf
+#os.environ['NOVA_RAX_AUTH'] = '1'
 #auth_url = 'http://127.0.0.1:8774/'
 #auth_data = {}
 
@@ -127,11 +141,7 @@ class Operation(object):
         return self.__class__.__name__
 
 
-all_operations = []
-
-
 class Create(Operation):
-    next_ops = all_operations
 
     def setup(self):
         # Randomly pick a name
@@ -144,9 +154,15 @@ class Create(Operation):
     def execute(self):
         print 'Creating server %s (image %s, flavor %sMB)' % (self.name,
                 self.image.name, self.flavor.ram)
-        server = self.tenant.client.servers.create(image=self.image.id,
-                                                   flavor=self.flavor.id,
-                                                   name=self.name)
+        try:
+            server = self.tenant.client.servers.create(image=self.image.id,
+                                                       flavor=self.flavor.id,
+                                                       name=self.name)
+        except:
+            msg = ("Unable to create server: %s (image %s, flavor %sMB)" % (self.name,
+                                                                            self.image,
+                                                                            self.flavor.ram))
+            LOG.error(msg)
 
         self.instance = Instance(server)
         self.instance.current_operation = self
@@ -167,8 +183,12 @@ class SetPassword(Operation):
     def execute(self):
         self.expected = 'state:ACTIVE'
         print '%s: set password to %s' % (self.instance.id, self.password)
-        self.tenant.client.servers.change_password(self.instance.server.id,
-                                                   self.password)
+        try:
+            self.tenant.client.servers.change_password(self.instance.server.id,
+                                                       self.password)
+        except:
+            msg = "Unable to change password"
+            LOG.error(msg)
 
     def update(self, result):
         if result == 'state:PASSWORD':
@@ -187,9 +207,14 @@ class Resize(Operation):
     def execute(self):
         if self.instance.server.status != 'ACTIVE':
             # Invalid state
+            status = self.instance.server.status
+            msg = "Unable to resize server while in %s" % status
+            LOG.error(msg)
             self.expected = 'error:409'
         elif self.flavor.id == self.instance.server.flavor['id']:
             # No change in size
+            msg = "Server is already %sMB" % self.flavor.ram
+            LOG.info(msg)
             self.expected = 'error:400'
         else:
             self.expected = 'state:VERIFY_RESIZE'
@@ -212,6 +237,8 @@ class ConfirmResize(Operation):
     def execute(self):
         if self.instance.server.status != 'VERIFY_RESIZE':
             self.expected = 'error:409'
+            msg = "Cannot confirm resize of server" 
+            LOG.error(msg)
 
         print '%s: confirm resize' % self.instance.id
         self.tenant.client.servers.confirm_resize(self.instance.server.id)
@@ -236,6 +263,8 @@ class Rescue(Operation):
     def execute(self):
         if self.instance.server.status != 'ACTIVE':
             # Invalid state
+            msg = "Cannot rescue server in %s" % self.instance.server.status
+            LOG.error(msg)
             self.expected = 'error:409'
         else:
             self.expected = 'state:RESCUE'
@@ -248,6 +277,8 @@ class Unrescue(Operation):
     def execute(self):
         if self.instance.server.status != 'RESCUE':
             # Invalid state
+            msg = "Cannot unrescue instance not in RESCUE"
+            LOG.error(msg)
             self.expected = 'error:409'
         else:
             self.expected = 'state:ACTIVE'
@@ -345,11 +376,12 @@ def tenant_loop(name, endtime):
                     op = instance.current_operation
                     action, expected = op.update('state:%s' % server.status)
                     if action == 'fail':
-                        print '%s: UNEXPECTED state change from %s to %s,' \
+                        msg = '%s: UNEXPECTED state change from %s to %s,' \
                               ' expecting %s' % (instance.id,
                                                  instance.server.status,
                                                  server.status,
                                                  expected)
+                        LOG.error(msg)
                         sys.exit(1)
                     elif action in ('wait', 'next'):
                         print '%s: state change from %s to %s' % \
@@ -551,7 +583,6 @@ def main():
         # threads that randomly decided to finish and kill everything off.
         tenants = []
         while True:
-    <<<<<<< HEAD
             thread = threading.Thread(target=tenant_thread, name=tenant, \
             args=(tenant,))
             thread.start()
