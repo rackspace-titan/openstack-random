@@ -23,7 +23,7 @@ import novaclient.exceptions
 import novaclient.v1_1.client
 
 log_file = './random.log'
-formatter = logging.Formatter('%(asctime)-15s %(message)s')
+formatter = logging.Formatter('TIME %(asctime)-15s %(message)s')
 LOG = logging.getLogger(__name__)
 file_handler = logging.FileHandler(log_file)
 console_handler = logging.StreamHandler()
@@ -45,6 +45,10 @@ servicename = os.environ['NOVA_SERVICE_NAME']
 
 users = {
         username: {'key': apikey, 'tenant': tenant},
+        'westmaas': {'key': apikey, 'tenant': tenant},
+        'komawar': {'key': apikey, 'tenant': tenant},
+        'hatboy112': {'key': apikey, 'tenant': tenant},
+        'blamar': {'key': apikey, 'tenant': tenant},
 }
 
 # staging auth conf
@@ -481,14 +485,15 @@ def multi_thread(end_time):
 #    """This block is for the debug"""
 #    respon = raw_input("Do you want to enter the os-ran mode? y/N  ")
 #    if respon=='y':
-    num_thrd_per_tnt = raw_input("Enter the number of threads that you want to \
-    run per tenant  ")
+    #num_thrd_per_tnt = raw_input("Enter the number of threads that you want to \
+    #run per tenant  ")
+    num_thrd_per_tnt = 30
     threads = {}
     myiter=0
 
     for kee, val in users.iteritems():
         for it in range(int(num_thrd_per_tnt)):
-            myiter= myiter + 1
+            myiter += 1
             threads[str(myiter)] = threading.Thread(target=tenant_thread, \
             name=kee, args=(kee, end_time))
             threads[str(myiter)].start()
@@ -506,7 +511,7 @@ def single_thread(end_time):
     threads = {}
     myiter=0
     for kee, val in users.iteritems():
-        myiter= myiter + 1
+        myiter += 1
         threads[str(myiter)] = threading.Thread(target=tenant_thread, \
         name=kee, args=(kee, end_time))
         threads[str(myiter)].start()
@@ -538,7 +543,7 @@ def main():
     options, args = parse_options()
     start_time = time.time()
     end_time = start_time + int(options.duration)
-    LOG.debug('Openstack random was started on' + str(start_time))
+    LOG.debug('Openstack random was started')
 
     LOG.info("The users in our db who will run os-ran are:\n")
     for kee, val in users.iteritems():
