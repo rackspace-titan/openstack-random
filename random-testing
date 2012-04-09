@@ -23,9 +23,12 @@ import novaclient.exceptions
 import novaclient.v1_1.client
 
 log_file = './random.log'
+formatter = logging.Formatter('%(asctime)-15s %(message)s')
 LOG = logging.getLogger(__name__)
 file_handler = logging.FileHandler(log_file)
 console_handler = logging.StreamHandler()
+file_handler.setFormatter(formatter)
+#console_handler.setFormatter(formatter)
 LOG.addHandler(console_handler)
 LOG.addHandler(file_handler)
 LOG.setLevel(logging.INFO)
@@ -331,17 +334,7 @@ def tenant_loop(name, endtime):
         LOG.info('%s %-14s %s' % (server.id, server.status, server.name))
 
         instance = Instance(server)
-
-        # Each step specifies an expected state, so if we have instances
-        # that already exist and are in an operation, let's start them
-        # out by waiting until they finish operation.
-        if instance.current_state == 'BUILD':
-            instance.current_operation = Create(tenant, instance)
-        elif instance.current_state == 'RESIZE':
-            instance.current_operation = Resize(tenant, instance)
-        elif instance.current_state == 'RESCUE':
-            instance.current_operation = Rescue(tenant, instance)
-
+        finish_current_operation(instance)
         tenant.add_instance(instance)
 
     while True:
@@ -398,28 +391,7 @@ def tenant_loop(name, endtime):
             instance.current_state = server.status
 
             if not instance.current_operation:
-                # Pick a new operation and do it
-                op = weighted_sample(operations, 1)[0](tenant, instance)
-                op.setup()
-                try:
-                    op.execute()
-                    instance.current_operation = op
-                except novaclient.exceptions.ClientException as exc:
-                    action, expected = op.update('error:%d' % exc.code)
-                    if action == 'fail':
-                        msg = '%s: UNEXPECTED error %d, expecting %s' % \
-                                (instance.id, exc.code, expected)
-                        LOG.error(msg)
-                        sys.exit(1)
-                    elif action == 'next':
-                        msg = '%s: received expected error %d' % \
-                                (instance.id, exc.code)
-                        LOG.info(msg)
-                    else:
-                        msg = '%s: UNKNOWN action %r' % (instance.id, action)
-                        LOG.error(msg)
-                        raise ValueError('Unknown error action %r' % action)
-
+                new_operation(instance)
                 workdone = True
 
         for serverid in serverids:
@@ -434,6 +406,38 @@ def tenant_loop(name, endtime):
         if time.time() > endtime:
             #NOTE(ameade): add call to clean up here
             return
+
+def finish_current_operation(instance):
+    """Allow an instance to finish the current operation before starting a new one"""
+    if instance.current_state == 'BUILD':
+        instance.current_operation = Create(tenant, instance)
+    elif instance.current_state == 'RESIZE':
+        instance.current_operation = Resize(tenant, instance)
+    elif instance.current_state == 'RESCUE':
+        instance.current_operation = Rescue(tenant, instance)
+
+def new_operation(instance):
+    """Pick a new operation and do it"""
+    op = weighted_sample(operations, 1)[0](tenant, instance)
+    op.setup()
+    try:
+        op.execute()
+        instance.current_operation = op
+    except novaclient.exceptions.ClientException as exc:
+        action, expected = op.update('error:%d' % exc.code)
+        if action == 'fail':
+            msg = '%s: UNEXPECTED error %d, expecting %s' % \
+                    (instance.id, exc.code, expected)
+            LOG.error(msg)
+            sys.exit(1)
+        elif action == 'next':
+            msg = '%s: received expected error %d' % \
+                    (instance.id, exc.code)
+            LOG.info(msg)
+        else:
+            msg = '%s: UNKNOWN action %r' % (instance.id, action)
+            LOG.error(msg)
+            raise ValueError('Unknown error action %r' % action)
 
 def tenant_thread(tenant, end_time):
     try:
@@ -502,7 +506,6 @@ def single_thread(end_time):
     threads = {}
     myiter=0
     for kee, val in users.iteritems():
-        LOG.info("inside for loop")
         myiter= myiter + 1
         threads[str(myiter)] = threading.Thread(target=tenant_thread, \
         name=kee, args=(kee, end_time))
