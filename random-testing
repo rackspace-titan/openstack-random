@@ -22,13 +22,16 @@ import time
 import novaclient.exceptions
 import novaclient.v1_1.client
 
-
+log_file = './random.log'
 LOG = logging.getLogger(__name__)
-logging.basicConfig(filename='random.log', level=LOG.debug)
-
-
+file_handler = logging.FileHandler(log_file)
+console_handler = logging.StreamHandler()
+LOG.addHandler(console_handler)
+LOG.addHandler(file_handler)
+LOG.setLevel(logging.INFO)
 
 max_servers = 1
+tenants = []
 
 username = os.environ['NOVA_USERNAME']
 apikey = os.environ['NOVA_API_KEY']
@@ -147,24 +150,25 @@ class Create(Operation):
         self.flavor = random.sample(self.tenant.flavors, 1)[0]
 
     def execute(self):
-        print 'Creating server %s (image %s, flavor %dMB)' % (self.name,
-                self.image.name, self.flavor.ram)
+        LOG.info('Creating server %s (image %s, flavor %dMB)' % (self.name,
+                self.image.name, self.flavor.ram))
         try:
             server = self.tenant.client.servers.create(image=self.image.id,
                                                        flavor=self.flavor.id,
                                                        name=self.name)
         except:
-            msg = ("Unable to create server: %s (image %s, flavor %dMB)") % (self.name,
-                                                                            self.image,
-                                                                            self.flavor.ram)
+            msg = ("Unable to create server: \
+                    %s (image %s, flavor %dMB)") % (self.name,
+                                                    self.image,
+                                                    self.flavor.ram)
             LOG.error(msg)
 
         self.instance = Instance(server)
         self.instance.current_operation = self
         self.tenant.add_instance(self.instance)
 
-        print '%s: created server %s' % (self.instance.id,
-                                         self.instance.server.id)
+        LOG.info('%s: created server %s' % (self.instance.id,
+                                         self.instance.server.id))
 
     def __str__(self):
         return 'Create name=%r, image=%r, flavor=%dMB' % (self.name,
@@ -177,8 +181,8 @@ class SetPassword(Operation):
 
     def execute(self):
         self.expected = 'state:ACTIVE'
-        msg = "Unable to change password"
-        LOG.error(msg)
+        #msg = "Unable to change password"
+        #LOG.error(msg)
 
     def update(self, result):
         if result == 'state:PASSWORD':
@@ -203,13 +207,12 @@ class Resize(Operation):
             self.expected = 'error:409'
         elif self.flavor.id == self.instance.server.flavor['id']:
             # No change in size
-            msg = "Server is already %dMB" % self.flavor.ram
-            LOG.info(msg)
+            LOG.info("Server is already %dMB" % self.flavor.ram)
             self.expected = 'error:400'
         else:
             self.expected = 'state:VERIFY_RESIZE'
 
-        print '%s: resize to %dMB' % (self.instance.id, self.flavor.ram)
+        LOG.info('%s: resize to %dMB' % (self.instance.id, self.flavor.ram))
         self.tenant.client.servers.resize(self.instance.server.id,
                                           self.flavor.id)
 
@@ -230,7 +233,7 @@ class ConfirmResize(Operation):
             msg = "Cannot confirm resize of server" 
             LOG.error(msg)
 
-        print '%s: confirm resize' % self.instance.id
+        LOG.info('%s: confirm resize' % self.instance.id)
         self.tenant.client.servers.confirm_resize(self.instance.server.id)
 
 
@@ -239,7 +242,7 @@ class RevertResize(Operation):
         if self.instance.server.status != 'VERIFY_RESIZE':
             self.expected = 'error:409'
 
-        print '%s: revert resize' % self.instance.id
+        LOG.info('%s: revert resize' % self.instance.id)
         self.tenant.client.servers.revert_resize(self.instance.server.id)
 
     def update(self, result):
@@ -259,7 +262,7 @@ class Rescue(Operation):
         else:
             self.expected = 'state:RESCUE'
 
-        print '%s: rescue' % self.instance.id
+        LOG.info('%s: rescue' % self.instance.id)
         self.tenant.client.servers.rescue(self.instance.server.id)
 
 
@@ -273,13 +276,13 @@ class Unrescue(Operation):
         else:
             self.expected = 'state:ACTIVE'
 
-        print '%s: unrescue' % self.instance.id
+        LOG.info('%s: unrescue' % self.instance.id)
         self.tenant.client.servers.unrescue(self.instance.server.id)
 
 
 class Delete(Operation):
     def execute(self):
-        print '%s: deleting' % self.instance.id
+        LOG.info('%s: deleting' % self.instance.id)
         self.tenant.client.servers.delete(self.instance.server.id)
 
     def update(self, result):
@@ -310,7 +313,7 @@ def clean_up(name):
     tenant = Tenant(name)
 
     for server in tenant.client.servers.list():
-        print '%s %-14s %s' % (server.id, server.status, server.name)
+        LOG.info('%s %-14s %s' % (server.id, server.status, server.name))
         instance = Instance(server)
         tenant.add_instance(instance)
 
@@ -325,7 +328,7 @@ def tenant_loop(name, endtime):
     tenant = Tenant(name)
 
     for server in tenant.client.servers.list():
-        print '%s %-14s %s' % (server.id, server.status, server.name)
+        LOG.info('%s %-14s %s' % (server.id, server.status, server.name))
 
         instance = Instance(server)
 
@@ -374,18 +377,21 @@ def tenant_loop(name, endtime):
                         LOG.error(msg)
                         sys.exit(1)
                     elif action in ('wait', 'next'):
-                        print '%s: state change from %s to %s' % \
+                        msg = '%s: state change from %s to %s' % \
                                 (instance.id, instance.server.status,
                                  server.status)
+                        LOG.info(msg)
                         if action == 'next':
                             instance.current_operation = None
                     else:
-                        print '%s: UNKNOWN action %r' % (instance.id, action)
+                        msg = '%s: UNKNOWN action %r' % (instance.id, action)
+                        LOG.info(msg)
                         raise ValueError('Unknown state change action %r' %
                                          action)
                 else:
-                    print '%s: state change from %s to %s' % (instance.id,
+                    msg = '%s: state change from %s to %s' % (instance.id,
                           instance.server.status, server.status)
+                    LOG.info(msg)
 
 
             instance.server = server
@@ -401,14 +407,17 @@ def tenant_loop(name, endtime):
                 except novaclient.exceptions.ClientException as exc:
                     action, expected = op.update('error:%d' % exc.code)
                     if action == 'fail':
-                        print '%s: UNEXPECTED error %d, expecting %s' % \
+                        msg = '%s: UNEXPECTED error %d, expecting %s' % \
                                 (instance.id, exc.code, expected)
+                        LOG.error(msg)
                         sys.exit(1)
                     elif action == 'next':
-                        print '%s: received expected error %d' % \
+                        msg = '%s: received expected error %d' % \
                                 (instance.id, exc.code)
+                        LOG.info(msg)
                     else:
-                        print '%s: UNKNOWN action %r' % (instance.id, action)
+                        msg = '%s: UNKNOWN action %r' % (instance.id, action)
+                        LOG.error(msg)
                         raise ValueError('Unknown error action %r' % action)
 
                 workdone = True
@@ -417,7 +426,7 @@ def tenant_loop(name, endtime):
             instance = tenant.instances_by_serverid[serverid]
             del tenant.instances_by_serverid[serverid]
             del tenant.instances_by_shortid[instance.id]
-            print '%s: no longer exists' % instance.id
+            LOG.info('%s: no longer exists' % instance.id)
 
         if not workdone:
             time.sleep(5)
@@ -426,19 +435,22 @@ def tenant_loop(name, endtime):
             #NOTE(ameade): add call to clean up here
             return
 
-def tenant_thread(tenant):
+def tenant_thread(tenant, end_time):
     try:
-        tenant_loop(tenant)
-    finally:
-        tenants.append(tenant)
-        thread_event.set()
+        LOG.info(tenant)
+        tenant_loop(tenant, end_time)
+    except Exception as e:
+        LOG.info(e)
+    #finally:
+    #    tenants.append(tenant)
+    #    thread_event.set()
 
 def parse_options():
     parser = optparse.OptionParser()
     parser.add_option("-n",
                       "--duration",
                       dest="duration",
-                      help="Approzimate amount of time to run in seconds.",
+                      help="Approximate amount of time to run in seconds.",
                       default=600)
     parser.add_option("-w",
                       "--wipe",
@@ -476,10 +488,12 @@ def multi_thread(end_time):
             threads[str(myiter)] = threading.Thread(target=tenant_thread, \
             name=kee, args=(kee, end_time))
             threads[str(myiter)].start()
+            #if not tenants:
+                #thread_event.wait(10)
 
     for i in range(myiter):
         threads[str(i+1)].join()
-
+    
 #    """End of debug block"""
 #tenant_loop('komawar')
 
@@ -488,10 +502,13 @@ def single_thread(end_time):
     threads = {}
     myiter=0
     for kee, val in users.iteritems():
+        LOG.info("inside for loop")
         myiter= myiter + 1
         threads[str(myiter)] = threading.Thread(target=tenant_thread, \
         name=kee, args=(kee, end_time))
         threads[str(myiter)].start()
+        #if not tenants:
+            #thread_event.wait(10)
 
     for i in range(myiter):
         threads[str(i+1)].join()
@@ -518,30 +535,31 @@ def main():
     options, args = parse_options()
     start_time = time.time()
     end_time = start_time + int(options.duration)
+    LOG.debug('Openstack random was started on' + str(start_time))
 
-    print "The users in our db who will run os-ran are:\n"
+    LOG.info("The users in our db who will run os-ran are:\n")
     for kee, val in users.iteritems():
-        print kee + '\n'
+        LOG.info(kee + '\n')
 
     if options.add_users==True:
-        print "Adding users to account."
+        LOG.info("Adding users to account.")
         enter_users()
     else:
-        print "Not adding users to account."
+        LOG.info("Not adding users to account.")
         pass
 
     if options.cleanup_acc==True:
-        print "Account is being wiped."
+        LOG.info("Account is being wiped.")
         for kee, val in users.iteritems():
             clean_up(kee)
     else:
-        print "Account is not being wiped."
+        LOG.info("Account is not being wiped.")
     
     if options.multi_thread==True:
-        print "Entering the multi threaded block."
+        LOG.info("Entering the multi threaded block.")
         multi_thread(end_time)
     else:
-        print "Entering the single threaded block."
+        LOG.info("Entering the single threaded block.")
         single_thread(end_time)
 
 # Randomly start new tenants. Both starting new work and restarting tenant
