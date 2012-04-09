@@ -48,11 +48,6 @@ auth_data = {
     'service_name': servicename,
 }
 
-# local host aut conf
-#os.environ['NOVA_RAX_AUTH'] = '1'
-#auth_url = 'http://127.0.0.1:8774/'
-#auth_data = {}
-
 
 def weighted_sample(items, n):
     "Roulette wheel selection"
@@ -152,16 +147,16 @@ class Create(Operation):
         self.flavor = random.sample(self.tenant.flavors, 1)[0]
 
     def execute(self):
-        print 'Creating server %s (image %s, flavor %sMB)' % (self.name,
+        print 'Creating server %s (image %s, flavor %dMB)' % (self.name,
                 self.image.name, self.flavor.ram)
         try:
             server = self.tenant.client.servers.create(image=self.image.id,
                                                        flavor=self.flavor.id,
                                                        name=self.name)
         except:
-            msg = ("Unable to create server: %s (image %s, flavor %sMB)" % (self.name,
+            msg = ("Unable to create server: %s (image %s, flavor %dMB)") % (self.name,
                                                                             self.image,
-                                                                            self.flavor.ram))
+                                                                            self.flavor.ram)
             LOG.error(msg)
 
         self.instance = Instance(server)
@@ -182,13 +177,8 @@ class SetPassword(Operation):
 
     def execute(self):
         self.expected = 'state:ACTIVE'
-        print '%s: set password to %s' % (self.instance.id, self.password)
-        try:
-            self.tenant.client.servers.change_password(self.instance.server.id,
-                                                       self.password)
-        except:
-            msg = "Unable to change password"
-            LOG.error(msg)
+        msg = "Unable to change password"
+        LOG.error(msg)
 
     def update(self, result):
         if result == 'state:PASSWORD':
@@ -213,7 +203,7 @@ class Resize(Operation):
             self.expected = 'error:409'
         elif self.flavor.id == self.instance.server.flavor['id']:
             # No change in size
-            msg = "Server is already %sMB" % self.flavor.ram
+            msg = "Server is already %dMB" % self.flavor.ram
             LOG.info(msg)
             self.expected = 'error:400'
         else:
