@@ -305,7 +305,10 @@ def clean_up(name):
 
         instance.current_operation = Delete(tenant, instance)
         instance.current_operation.setup()
-        instance.current_operation.execute()
+        try:
+            instance.current_operation.execute()
+        except novaclient.exceptions.ClientException as exc:
+            LOG.exception(exc);
 
 def tenant_loop(name, endtime):
     # FIXME: Implement personalities? (Blend of images, blend of flavors,
@@ -351,7 +354,6 @@ def tenant_loop(name, endtime):
                                                  server.status,
                                                  expected)
                         LOG.error(msg)
-                        sys.exit(1)
                     elif action in ('wait', 'next'):
                         msg = '%s: state change from %s to %s' % \
                                 (instance.id, instance.server.status,
@@ -373,7 +375,7 @@ def tenant_loop(name, endtime):
             instance.server = server
             instance.current_state = server.status
 
-            if not instance.current_operation:
+            while not instance.current_operation:
                 new_operation(instance)
                 workdone = True
 
@@ -410,8 +412,7 @@ def new_operation(instance):
         if action == 'fail':
             msg = '%s: UNEXPECTED error %d, expecting %s' % \
                     (instance.id, exc.code, expected)
-            LOG.error(msg)
-            sys.exit(1)
+            LOG.exception(msg)
         elif action == 'next':
             msg = '%s: received expected error %d' % \
                     (instance.id, exc.code)
@@ -420,6 +421,7 @@ def new_operation(instance):
             msg = '%s: UNKNOWN action %r' % (instance.id, action)
             LOG.error(msg)
             raise ValueError('Unknown error action %r' % action)
+        instance.current_operation = None
 
 def tenant_thread(tenant, end_time):
     try:
@@ -530,4 +532,8 @@ def main():
         single_thread(end_time)
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception as e:
+        LOG.exception(e);
+        sys.exit(1)
