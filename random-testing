@@ -316,6 +316,8 @@ def tenant_loop(name, endtime):
 
     tenant = Tenant(name)
 
+    if time.time() > endtime:
+        return
     for server in tenant.client.servers.list():
         LOG.info('%s %-14s %s' % (server.id, server.status, server.name))
 
@@ -324,6 +326,9 @@ def tenant_loop(name, endtime):
         tenant.add_instance(instance)
 
     while True:
+        if time.time() > endtime:
+            return
+
         if not tenant.instances_by_serverid:
             # We can't do anything useful without any instances
             op = Create(tenant)
@@ -387,9 +392,6 @@ def tenant_loop(name, endtime):
 
         if not workdone:
             time.sleep(5)
-
-        if time.time() > endtime:
-            return
 
 def finish_current_operation(instance):
     """Allow an instance to finish the current operation before starting a new one"""
@@ -520,6 +522,8 @@ def main():
     if options.cleanup_acc==True:
         LOG.info("Account is being wiped.")
         for kee, val in creds.users.iteritems():
+            if time.time() > end_time:
+                return 0
             clean_up(kee)
     else:
         LOG.info("Account is not being wiped.")
