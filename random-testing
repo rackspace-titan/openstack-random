@@ -45,10 +45,6 @@ servicename = os.environ['NOVA_SERVICE_NAME']
 
 users = {
         username: {'key': apikey, 'tenant': tenant},
-        'westmaas': {'key': apikey, 'tenant': tenant},
-        'komawar': {'key': apikey, 'tenant': tenant},
-        'hatboy112': {'key': apikey, 'tenant': tenant},
-        'blamar': {'key': apikey, 'tenant': tenant},
 }
 
 # staging auth conf
@@ -408,7 +404,6 @@ def tenant_loop(name, endtime):
             time.sleep(5)
 
         if time.time() > endtime:
-            #NOTE(ameade): add call to clean up here
             return
 
 def finish_current_operation(instance):
@@ -449,9 +444,6 @@ def tenant_thread(tenant, end_time):
         tenant_loop(tenant, end_time)
     except Exception as e:
         LOG.info(e)
-    #finally:
-    #    tenants.append(tenant)
-    #    thread_event.set()
 
 def parse_options():
     parser = optparse.OptionParser()
@@ -478,15 +470,6 @@ def parse_options():
     return parser.parse_args()
     
 def multi_thread(end_time):
-# FIXME: Hack until the rest of the script is working and we want to
-# use multiple threads for multiple users
-# FIXED: To avoid over subscription on a machine, user input for the number
-# of threads is put in. 
-#    """This block is for the debug"""
-#    respon = raw_input("Do you want to enter the os-ran mode? y/N  ")
-#    if respon=='y':
-    #num_thrd_per_tnt = raw_input("Enter the number of threads that you want to \
-    #run per tenant  ")
     num_thrd_per_tnt = 30
     threads = {}
     myiter=0
@@ -497,17 +480,12 @@ def multi_thread(end_time):
             threads[str(myiter)] = threading.Thread(target=tenant_thread, \
             name=kee, args=(kee, end_time))
             threads[str(myiter)].start()
-            #if not tenants:
-                #thread_event.wait(10)
 
     for i in range(myiter):
         threads[str(i+1)].join()
-    
-#    """End of debug block"""
-#tenant_loop('komawar')
 
 def single_thread(end_time):
-#runs single thread per user
+    """Runs single thread per user."""
     threads = {}
     myiter=0
     for kee, val in users.iteritems():
@@ -515,8 +493,6 @@ def single_thread(end_time):
         threads[str(myiter)] = threading.Thread(target=tenant_thread, \
         name=kee, args=(kee, end_time))
         threads[str(myiter)].start()
-        #if not tenants:
-            #thread_event.wait(10)
 
     for i in range(myiter):
         threads[str(i+1)].join()
@@ -569,42 +545,6 @@ def main():
     else:
         LOG.info("Entering the single threaded block.")
         single_thread(end_time)
-
-# Randomly start new tenants. Both starting new work and restarting tenant
-# threads that randomly decided to finish and kill everything off.
-
-    """The below given code is previously proposed fix for the multiple threads.
-    Keeping it here as an archive if anyone sees difference in what the proposed and
-    fixed code does.
-    tenants = []
-    while True:
-        thread = threading.Thread(target=tenant_thread, name=tenant, \
-        args=(tenant,))
-        thread.start()
-
-        # FIXME: Random delay, only if we don't have enough tenants
-        thread_event.wait(10)"""
-
-    """This is not needed as a part of threading anymore. pknouff: please check 
-    if you need this block is needed here in the main"""
-
-    """================================================================
-    =======
-    >>>>>>> 5f4c03ea758cb8093610596f0e324fc903592615
-        # FIXME: Hack until the rest of the script is working and we want to
-        # use multiple threads for multiple users
-        tenant_loop(username)
-
-        # Randomly start new tenants. Both starting new work and restarting tenant
-        # threads that randomly decided to finish and kill everything off.
-        tenants = []
-        while True:
-            thread = threading.Thread(target=tenant_thread, name=tenant, \
-            args=(tenant,))
-            thread.start()
-
-            # FIXME: Random delay, only if we don't have enough tenants
-            thread_event.wait(10)======================================"""
 
 if __name__ == "__main__":
     sys.exit(main())
