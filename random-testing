@@ -12,7 +12,6 @@
 # want to end up with an instance that is deleted.
 
 import logging
-import os
 import optparse
 import random
 import sys
@@ -21,6 +20,8 @@ import time
 
 import novaclient.exceptions
 import novaclient.v1_1.client
+
+import creds
 
 log_file = './random.log'
 formatter = logging.Formatter('TIME %(asctime)-15s %(message)s')
@@ -35,24 +36,6 @@ LOG.setLevel(logging.INFO)
 
 max_servers = 1
 tenants = []
-
-username = os.environ['NOVA_USERNAME']
-apikey = os.environ['NOVA_API_KEY']
-tenant = os.environ['NOVA_PROJECT_ID']
-url = os.environ['NOVA_URL']
-region = os.environ['NOVA_REGION_NAME']
-servicename = os.environ['NOVA_SERVICE_NAME']
-
-users = {
-        username: {'key': apikey, 'tenant': tenant},
-}
-
-# staging auth conf
-auth_url = url
-auth_data = {
-    'region_name': region,
-    'service_name': servicename,
-}
 
 
 def weighted_sample(items, n):
@@ -85,15 +68,15 @@ class Instance(object):
 class Tenant(object):
     def __init__(self, name):
         self.name = name
-        self.creds = users[name]
+        self.creds = creds.users[name]
 
         self.client = novaclient.v1_1.client.Client(
                 self.name,
                 self.creds['key'],
                 self.creds['tenant'],
-                auth_url,
+                creds.auth_url,
                 insecure=True,
-                **auth_data)
+                **creds.auth_data)
 
         self.flavors = self.client.flavors.list()
         self.flavors.sort(lambda a, b: cmp(a.ram, b.ram))
@@ -409,15 +392,15 @@ def tenant_loop(name, endtime):
 def finish_current_operation(instance):
     """Allow an instance to finish the current operation before starting a new one"""
     if instance.current_state == 'BUILD':
-        instance.current_operation = Create(tenant, instance)
+        instance.current_operation = Create(creds.tenant, instance)
     elif instance.current_state == 'RESIZE':
-        instance.current_operation = Resize(tenant, instance)
+        instance.current_operation = Resize(creds.tenant, instance)
     elif instance.current_state == 'RESCUE':
-        instance.current_operation = Rescue(tenant, instance)
+        instance.current_operation = Rescue(creds.tenant, instance)
 
 def new_operation(instance):
     """Pick a new operation and do it"""
-    op = weighted_sample(operations, 1)[0](tenant, instance)
+    op = weighted_sample(operations, 1)[0](creds.tenant, instance)
     op.setup()
     try:
         op.execute()
@@ -474,7 +457,7 @@ def multi_thread(end_time):
     threads = {}
     myiter=0
 
-    for kee, val in users.iteritems():
+    for kee, val in creds.users.iteritems():
         for it in range(int(num_thrd_per_tnt)):
             myiter += 1
             threads[str(myiter)] = threading.Thread(target=tenant_thread, \
@@ -488,7 +471,7 @@ def single_thread(end_time):
     """Runs single thread per user."""
     threads = {}
     myiter=0
-    for kee, val in users.iteritems():
+    for kee, val in creds.users.iteritems():
         myiter += 1
         threads[str(myiter)] = threading.Thread(target=tenant_thread, \
         name=kee, args=(kee, end_time))
@@ -504,10 +487,10 @@ def enter_users():
         ans = raw_input("Do you wish to enter more users/tenant? y/N  ")
         if ans=='y' or ans=='Y' or ans=='Yes' or ans=='yes':
             mykey = raw_input("Enter the user name of the tenant  ")
-            users[mykey] = {}
-            users[mykey]['key'] = raw_input("Please enter the api key for this\
+            creds.users[mykey] = {}
+            creds.users[mykey]['key'] = raw_input("Please enter the api key for this\
      user  ")
-            users[mykey]['tenant'] = raw_input("Please enter the tenant id for\
+            creds.users[mykey]['tenant'] = raw_input("Please enter the tenant id for\
      this user  ")
             ans = 'y'
         elif ans=='n' or ans=='N' or ans=='No' or ans=='no':
@@ -522,7 +505,7 @@ def main():
     LOG.debug('Openstack random was started')
 
     LOG.info("The users in our db who will run os-ran are:\n")
-    for kee, val in users.iteritems():
+    for kee, val in creds.users.iteritems():
         LOG.info(kee + '\n')
 
     if options.add_users==True:
@@ -534,7 +517,7 @@ def main():
 
     if options.cleanup_acc==True:
         LOG.info("Account is being wiped.")
-        for kee, val in users.iteritems():
+        for kee, val in creds.users.iteritems():
             clean_up(kee)
     else:
         LOG.info("Account is not being wiped.")
