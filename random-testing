@@ -322,7 +322,7 @@ def tenant_loop(name, endtime):
         LOG.info('%s %-14s %s' % (server.id, server.status, server.name))
 
         instance = Instance(server)
-        finish_current_operation(instance)
+        finish_current_operation(tenant, instance)
         tenant.add_instance(instance)
 
     while True:
@@ -381,7 +381,7 @@ def tenant_loop(name, endtime):
             instance.current_state = server.status
 
             while not instance.current_operation:
-                new_operation(instance)
+                new_operation(tenant, instance)
                 workdone = True
 
         for serverid in serverids:
@@ -393,18 +393,18 @@ def tenant_loop(name, endtime):
         if not workdone:
             time.sleep(5)
 
-def finish_current_operation(instance):
+def finish_current_operation(tenant, instance):
     """Allow an instance to finish the current operation before starting a new one"""
     if instance.current_state == 'BUILD':
-        instance.current_operation = Create(creds.tenant, instance)
+        instance.current_operation = Create(tenant, instance)
     elif instance.current_state == 'RESIZE':
-        instance.current_operation = Resize(creds.tenant, instance)
+        instance.current_operation = Resize(tenant, instance)
     elif instance.current_state == 'RESCUE':
-        instance.current_operation = Rescue(creds.tenant, instance)
+        instance.current_operation = Rescue(tenant, instance)
 
-def new_operation(instance):
+def new_operation(tenant, instance):
     """Pick a new operation and do it"""
-    op = weighted_sample(operations, 1)[0](creds.tenant, instance)
+    op = weighted_sample(operations, 1)[0](tenant, instance)
     op.setup()
     try:
         op.execute()
