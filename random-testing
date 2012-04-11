@@ -395,6 +395,8 @@ def tenant_loop(name, endtime):
 
 def finish_current_operation(tenant, instance):
     """Allow an instance to finish the current operation before starting a new one"""
+    if instance.current_operation:
+        return
     if instance.current_state == 'BUILD':
         instance.current_operation = Create(tenant, instance)
     elif instance.current_state == 'RESIZE':
