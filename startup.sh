@@ -6,6 +6,10 @@ else
     echo "You need to enter the file with list of hostnames."
 fi
 
+`cd /home/osran; nohup ./random-testing > run.log`
+
+echo "done"
+
 while read line; do    
     echo $line
     ssh -n -f root@$line "cd /home/osran; nohup ./random-testing > run.log "
