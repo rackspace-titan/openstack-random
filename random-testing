@@ -380,7 +380,7 @@ def tenant_loop(name, endtime):
             instance.server = server
             instance.current_state = server.status
 
-            while not instance.current_operation:
+            if not instance.current_operation:
                 new_operation(tenant, instance)
                 workdone = True
 
@@ -423,7 +423,6 @@ def new_operation(tenant, instance):
             msg = '%s: UNKNOWN action %r' % (instance.id, action)
             LOG.error(msg)
             raise ValueError('Unknown error action %r' % action)
-        instance.current_operation = None
 
 def tenant_thread(tenant, end_time):
     try:
