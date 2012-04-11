@@ -359,6 +359,11 @@ def tenant_loop(name, endtime):
                                                  server.status,
                                                  expected)
                         LOG.error(msg)
+                        if server.status == "ERROR":
+                            msg = '%s: Instance fault: %s:%s' % (instance.id,
+                                                 server.fault.get('message', ''),
+                                                 server.fault.get('code', ''))
+                            LOG.error(msg)
                     elif action in ('wait', 'next'):
                         msg = '%s: state change from %s to %s' % \
                                 (instance.id, instance.server.status,
