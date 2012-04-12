@@ -8,6 +8,7 @@ region = os.environ['NOVA_REGION_NAME']
 servicename = os.environ['NOVA_SERVICE_NAME']
 
 users = {
+        #username : {'key': apikey, 'tenant': tenant},
         'komawar': {'key': apikey, 'tenant': tenant},
         'westmaas': {'key': apikey, 'tenant': tenant},
         'blamar': {'key': apikey, 'tenant': tenant},
