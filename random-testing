@@ -23,8 +23,10 @@ import novaclient.v1_1.client
 
 import creds
 
+DEBUG_INFO = False
+
 log_file = './debug.log'
-formatter = logging.Formatter('TIME %(asctime)-15s %(message)s')
+formatter = logging.Formatter('%(message)s %(asctime)-15s')
 LOG = logging.getLogger(__name__)
 file_handler = logging.FileHandler(log_file)
 console_handler = logging.StreamHandler()
@@ -32,7 +34,11 @@ file_handler.setFormatter(formatter)
 #console_handler.setFormatter(formatter)
 LOG.addHandler(console_handler)
 LOG.addHandler(file_handler)
-LOG.setLevel(logging.INFO)
+
+if DEBUG_INFO:
+    LOG.SetLevel(logging.DEBUG)
+else:
+    LOG.setLevel(logging.INFO)
 
 max_servers = 1
 tenants = []
@@ -433,7 +439,6 @@ def new_operation(tenant, instance):
 
 def tenant_thread(tenant, end_time):
     try:
-        LOG.info(tenant)
         tenant_loop(tenant, end_time)
     except Exception as e:
         LOG.info(e)
@@ -460,6 +465,11 @@ def parse_options():
                       action="store_true",
                       dest="add_users",
                       help="Enable addition of multiple users on command line.")
+    parser.add_option("-d",
+                      "--debug",
+                      action="store_true",
+                      dest="debugging_info",
+                      help="Enable additional debugging information.")
     return parser.parse_args()
     
 def multi_thread(end_time):
@@ -470,6 +480,7 @@ def multi_thread(end_time):
     for kee, val in creds.users.iteritems():
         for it in range(int(num_thrd_per_tnt)):
             myiter += 1
+            LOG.info("The user for thread %i is %s" % (myiter, kee))
             threads[str(myiter)] = threading.Thread(target=tenant_thread, \
             name=kee, args=(kee, end_time))
             threads[str(myiter)].start()
@@ -483,6 +494,7 @@ def single_thread(end_time):
     myiter=0
     for kee, val in creds.users.iteritems():
         myiter += 1
+        LOG.info("The user for thread %i is %s" % (myiter, kee))
         threads[str(myiter)] = threading.Thread(target=tenant_thread, \
         name=kee, args=(kee, end_time))
         threads[str(myiter)].start()
@@ -540,10 +552,13 @@ def main():
     else:
         LOG.info("Entering the single threaded block.")
         single_thread(end_time)
+    if options.debugging_info==True:
+        DEBUG_INFO = True
 
 if __name__ == "__main__":
     try:
         sys.exit(main())
     except Exception as e:
         LOG.exception(e);
+        LOG.info("os-ran exited")
         sys.exit(1)
