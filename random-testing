@@ -23,8 +23,6 @@ import novaclient.v1_1.client
 
 import creds
 
-DEBUG_INFO = False
-
 log_file = './debug.log'
 formatter = logging.Formatter('%(message)s %(asctime)-15s')
 LOG = logging.getLogger(__name__)
@@ -34,11 +32,7 @@ file_handler.setFormatter(formatter)
 #console_handler.setFormatter(formatter)
 LOG.addHandler(console_handler)
 LOG.addHandler(file_handler)
-
-if DEBUG_INFO:
-    LOG.SetLevel(logging.DEBUG)
-else:
-    LOG.setLevel(logging.INFO)
+LOG.setLevel(logging.INFO)
 
 max_servers = 1
 tenants = []
@@ -457,9 +451,9 @@ def parse_options():
                       help="Clean up the account before starting the os-ran.")
     parser.add_option("-p",
                       "--parallel",
-                      action="store_true",
                       dest="multi_thread",
-                      help="Enable multi-threading for multiple users")
+                      help="Number of threads to run per tenant.",
+                      default=1)
     parser.add_option("-a",
                       "--add",
                       action="store_true",
@@ -472,32 +466,17 @@ def parse_options():
                       help="Enable additional debugging information.")
     return parser.parse_args()
     
-def multi_thread(end_time):
-    num_thrd_per_tnt = 30
+def multi_thread(end_time, threads_per_tenant=1):
     threads = {}
     myiter=0
 
     for kee, val in creds.users.iteritems():
-        for it in range(int(num_thrd_per_tnt)):
+        for it in range(int(threads_per_tenant)):
             myiter += 1
             LOG.info("The user for thread %i is %s" % (myiter, kee))
             threads[str(myiter)] = threading.Thread(target=tenant_thread, \
             name=kee, args=(kee, end_time))
             threads[str(myiter)].start()
-
-    for i in range(myiter):
-        threads[str(i+1)].join()
-
-def single_thread(end_time):
-    """Runs single thread per user."""
-    threads = {}
-    myiter=0
-    for kee, val in creds.users.iteritems():
-        myiter += 1
-        LOG.info("The user for thread %i is %s" % (myiter, kee))
-        threads[str(myiter)] = threading.Thread(target=tenant_thread, \
-        name=kee, args=(kee, end_time))
-        threads[str(myiter)].start()
 
     for i in range(myiter):
         threads[str(i+1)].join()
@@ -524,6 +503,10 @@ def main():
     options, args = parse_options()
     start_time = time.time()
     end_time = start_time + int(options.duration)
+
+    if options.debugging_info:
+        LOG.setLevel(logging.DEBUG)
+
     LOG.debug('Openstack random was started')
 
     LOG.info("The users in our db who will run os-ran are:\n")
@@ -546,14 +529,9 @@ def main():
     else:
         LOG.info("Account is not being wiped.")
     
-    if options.multi_thread==True:
-        LOG.info("Entering the multi threaded block.")
-        multi_thread(end_time)
-    else:
-        LOG.info("Entering the single threaded block.")
-        single_thread(end_time)
-    if options.debugging_info==True:
-        DEBUG_INFO = True
+    LOG.info("Running %d threads per tenant." % int(options.multi_thread))
+    multi_thread(end_time, int(options.multi_thread))
+
 
 if __name__ == "__main__":
     try:
